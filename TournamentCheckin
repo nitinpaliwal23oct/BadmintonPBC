@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel to HTML Table</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <style>
+        #myInput {
+            background-image: url('/css/searchicon.png'); /* Add a search icon to input */
+            background-position: 10px 12px; /* Position the search icon */
+            background-repeat: no-repeat; /* Do not repeat the icon image */
+            width: 100%; /* Full-width */
+            font-size: 16px; /* Increase font-size */
+            padding: 12px 20px 12px 40px; /* Add some padding */
+            border: 1px solid #ddd; /* Add a grey border */
+            margin-bottom: 12px; /* Add some space below the input */
+          }
+        #excelTable {
+            background-image: url('/css/searchicon.png'); /* Add a search icon to input */
+            background-position: 10px 12px; /* Position the search icon */
+            background-repeat: no-repeat; /* Do not repeat the icon image */
+            width: 100%; /* Full-width */
+            font-size: 16px; /* Increase font-size */
+            padding: 12px 20px 12px 40px; /* Add some padding */
+            border: 1px solid #ddd; /* Add a grey border */
+            margin-bottom: 12px; /* Add some space below the input */
+          }
+          
+          #excelTable {
+            border-collapse: collapse; /* Collapse borders */
+            width: 100%; /* Full-width */
+            border: 1px solid #ddd; /* Add a grey border */
+            font-size: 18px; /* Increase font-size */
+          }
+          
+          #excelTable th, #excelTable td {
+            text-align: left; /* Left-align text */
+            padding: 12px; /* Add padding */
+            width: 12%;
+          }
+          
+          #excelTable tr {
+            /* Add a bottom border to all table rows */
+            border-bottom: 1px solid #ddd;
+          }
+          
+          #excelTable tr.header, #excelTable tr:hover {
+            /* Add a grey background color to the table header and on hover */
+            background-color: #f1f1f1;
+          }
+    </style>
+</head>
+<body>
+    <h1>Upload an Excel file to display as a table</h1>
+    <input type="file" id="fileInput" accept=".xlsx, .xls">
+    <br><br>
+    <input type="text" id="myInput" onkeyup="filterRows()" placeholder="Search for names..">
+    <table id="excelTable">
+        <thead>
+            <th>Player 1 Name</th>
+            <th>Player 2 Name</th>
+            <th>Division</th>
+            <th>Player 1 BI Number</th>
+            <th>Player 2 BI Number</th>
+            <th>Email Address</th>
+            <th>Phone Number</th>
+            <th>Checked In?</th>
+        </thead>
+        <tbody id="tableRows">
+        </tbody>
+    </table>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', handleFile, false);
+        let XL_row_object;
+        let divisionsIndexes = [];
+        let divisions = [];
+        window.onload = function() {
+
+            var playerEntries = window.localStorage.getItem('playerEntries');
+            if (playerEntries !== null){
+                XL_row_object = JSON.parse(playerEntries);
+                console.log(XL_row_object);
+                setTable();
+                divisions = JSON.parse(window.localStorage.getItem('divisions'));
+                divisionsIndexes = JSON.parse(window.localStorage.getItem('divisionsIndexes'));
+                saveInTournament();
+            }
+        
+        }
+        
+        function handleFile(e) {
+            window.localStorage.setItem('playerEntries', []);
+            window.localStorage.setItem('divisions', []);
+            window.localStorage.setItem('divisionsIndexes', []);
+            const file = e.target.files[0];
+            if (!file) {
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                XL_row_object = XLSX.utils.sheet_to_row_object_array(worksheet);
+                XL_row_object.forEach((item) => {
+                    item.isAttending = false;
+                    item.P1Name = item["Player 1 First Name"] +' ' + item["Player 1 Surname"];
+                    item.P2Name = item["Player 2 First Name"] +' ' + item["Player 2 Surname"];
+                });
+                setTable();
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+        
+        function setTable() {
+                let  tableRow = '';
+                let index = 0;
+                XL_row_object.forEach((item) => {
+                    tableRow += `<tr>`;
+                        tableRow += `<td><span>${item.P1Name}</span></td>`;  
+                        tableRow += `<td><span>${item.P2Name}</span></td>`; 
+                        tableRow += `<td><span>${item["Division"]}</span></td>`; 
+                        tableRow += `<td><span>${item["Player 1 BI number"]}</span></td>`; 
+                        tableRow += `<td><span>${item["Player 2 BI number"]}</span></td>`; 
+                        tableRow += `<td><span>${item["Contact email"]}</span></td>`; 
+                        tableRow += `<td><span>${item["Contact mobile number"]}</span></td>`;
+                        if(item.isAttending)
+                            tableRow += `<td><span class="hover" style="border: 1px solid lightgrey; padding: 5px 10px; box-shadow: 3px 3px 3px lightgrey;" onclick="toggleAttending(${index})">Attending</span></td>`;
+                        else
+                        tableRow += `<td><span class="hover" style="border: 1px solid lightgrey; padding: 5px 10px; box-shadow: 3px 3px 3px lightgrey;" onclick="toggleAttending(${index})">Not Attending</span></td>`;
+                    tableRow +=`</tr>`;  
+                    index +=1;              
+                });
+                document.getElementById("tableRows").innerHTML = tableRow;
+        }
+
+        function toggleAttending(index) {
+            let confirmationChoice;
+            if(XL_row_object[index].isAttending)
+                confirmationChoice = confirm(`${XL_row_object[index].P1Name} and ${XL_row_object[index].P2Name} have not checked in yet?`);
+            else
+                confirmationChoice = confirm(`${XL_row_object[index].P1Name} and ${XL_row_object[index].P2Name} have checked in now?`);
+            
+            if(confirmationChoice) {
+                XL_row_object[index].isAttending = !XL_row_object[index].isAttending;
+                if(XL_row_object[index].isAttending)
+                    addTournamentEntry(index);
+                else
+                    removeTournamentEntry(index);
+                setTable();
+                window.localStorage.setItem('playerEntries', JSON.stringify(XL_row_object));
+                window.localStorage.setItem('divisions', JSON.stringify(divisions));
+                window.localStorage.setItem('divisionsIndexes', JSON.stringify(divisionsIndexes));
+            }
+        }
+        function addTournamentEntry(playerIndex) {
+            if(divisionsIndexes.indexOf(XL_row_object[playerIndex].Division) == -1) {
+                divisionsIndexes.push(XL_row_object[playerIndex].Division);
+                divisions.push({ "name": XL_row_object[playerIndex].Division, "teams": [], "results": [], "semiFinals": [], "finals": [], "started": false, "finalsStarted": false, "hasSemis": false })
+            }
+            const divisionIndex = divisionsIndexes.indexOf(XL_row_object[playerIndex].Division);
+            const team = { "p1": XL_row_object[playerIndex].P1Name, "p2": XL_row_object[playerIndex].P2Name, "setsWon": 0, "setsLost": 0, "pointsDifference": 0, "gamesPlayed": 0}
+            divisions[divisionIndex].teams.push(team);
+            console.log(divisions);
+            saveInTournament();
+
+        }
+
+        function removeTournamentEntry(playerIndex) {
+            const divisionIndex = divisionsIndexes.indexOf(XL_row_object[playerIndex].Division);
+            const teamsInDiv = divisions[divisionIndex].teams;
+            let updatedTeams = [];
+            teamsInDiv.forEach((team) => {
+                if(team.p1+team.p2 != XL_row_object[playerIndex].P1Name+XL_row_object[playerIndex].P2Name) {
+                    updatedTeams.push(team);
+                }
+            });
+            divisions[divisionIndex].teams = updatedTeams;
+            saveInTournament();
+        }
+
+        function saveInTournament() {
+            var myHeaders = new Headers();
+            myHeaders.append("Content-Type", "application/json");
+
+            var raw = JSON.stringify({"divisions": divisions});
+            const bucketId = 'Test-PBC-Nitin';
+
+            var requestOptions = {
+            method: 'POST',
+            headers: myHeaders,
+            body: raw,
+            redirect: 'follow'
+            };
+            fetch("https://getpantry.cloud/apiv1/pantry/a188662b-5abc-4a13-8da0-30f0a8b05aab/basket/" + bucketId, requestOptions
+            ).then();
+        }
+
+        function filterRows() {
+            // Declare variables
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("myInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("excelTable");
+            tr = table.getElementsByTagName("tr");
+          
+            // Loop through all table rows, and hide those who don't match the search query
+            for (i = 0; i < tr.length; i++) {
+              td = tr[i].getElementsByTagName("td")[0];
+              if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                  tr[i].style.display = "";
+                } else {
+                  tr[i].style.display = "none";
+                }
+              }
+            }
+          }
+    </script>
+</body>
+</html>
